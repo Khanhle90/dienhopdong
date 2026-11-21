@@ -166,13 +166,16 @@ def replace_in_paragraph(paragraph, data):
         tag_r_idx = char_runs[tag_start_char] if tag_start_char < len(char_runs) else char_runs[start]
         tag_run = paragraph.runs[tag_r_idx]
         
-        # In đậm CHỈ KHI run chứa tag có bold=True (ví dụ {HoVaTen} trong Bên B)
+        # In đậm CHỈ KHI run chứa tag có bold=True (ví dụ {HoVaTen} trong Bên B) hoặc trường {CTV}
         is_bold = bool(tag_run.bold)
         is_italic = bool(tag_run.italic)
         
         # Quy tắc: nếu vị trí thay thế viết hoa thì tự động viết hoa (như {CTV})
+        # và tên ký {CTV} luôn luôn in đậm đúng thể thức chữ ký
         if tag.isupper() or normalize_key(tag) == 'ctv':
             val = val.upper()
+            if normalize_key(tag) == 'ctv':
+                is_bold = True
             
         font_name = tag_run.font.name if tag_run.font else None
         font_size = tag_run.font.size if tag_run.font else None

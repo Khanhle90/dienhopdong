@@ -1,4 +1,4 @@
-/* TÙY BIẾN GIAO DIỆN HIỆN ĐẠI & ĐỊNH DẠNG HỢP ĐỒNG A4 CHUẨN v2.1 */
+/* TÙY BIẾN GIAO DIỆN HIỆN ĐẠI & ĐỊNH DẠNG HỢP ĐỒNG A4 CHUẨN v2.2 */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -43,18 +43,21 @@ body {
   line-height: 1.35;
 }
 
-.contract-paper {
+/* Mỗi trang hợp đồng chuẩn A4 độc lập */
+.contract-subpage {
   width: 210mm;
-  padding: 20mm 15mm 20mm 20mm; /* Chuẩn văn bản: Trên 20, Dưới 20, Trái 20, Phải 15 */
+  min-height: 297mm;
+  padding: 18mm 15mm 18mm 20mm; /* Chuẩn thể thức: Trên 18, Dưới 18, Trái 20, Phải 15 */
   margin: 0 auto 30px auto;
   background: #ffffff;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
   page-break-after: always;
   break-after: page;
+  position: relative;
 }
 
-.contract-paper:last-child {
+.contract-subpage:last-child {
   page-break-after: avoid;
   break-after: avoid;
   margin-bottom: 0;
@@ -142,7 +145,7 @@ body {
   font-style: italic;
   font-size: 12pt;
   margin-top: 2pt;
-  margin-bottom: 50pt; /* Khoảng trống ký tên */
+  margin-bottom: 55pt; /* Khoảng trống ký tên chuẩn */
 }
 
 .chu-ky-ho-ten {
@@ -173,14 +176,14 @@ body {
 }
 
 /* =======================================================
-   ĐỊNH DẠNG IN ẤN CHUẨN XÁC:
-   - Ẩn toàn bộ giao diện web, modal, khung viền, nền xám
-   - Chỉ in vùng #print-area chứa văn bản hợp đồng thuần túy
-   - Phân trang chuẩn A4 từng người, không dính liền
+   ĐỊNH DẠNG IN ẤN CHUẨN XÁC TUYỆT ĐỐI:
+   - Ẩn toàn bộ modal, toast, thanh điều hướng, khung viền
+   - Mỗi trang con (.contract-subpage) in đúng 1 trang A4
+   - Lề trang @page giữ an toàn, không bị cắt chữ đầu/cuối trang
 ======================================================= */
 @media print {
-  /* ẨN TOÀN BỘ CÁC THÀNH PHẦN GIAO DIỆN & MODAL */
-  header, main, footer, #completion-modal, #preview-modal, .no-print {
+  /* Ẩn toàn bộ UI, modal, toast thông báo */
+  header, main, footer, #completion-modal, #preview-modal, .no-print, [class*="toast"], .toast-alert {
     display: none !important;
     visibility: hidden !important;
   }
@@ -192,7 +195,6 @@ body {
     width: 100% !important;
   }
 
-  /* HIỂN THỊ VÙNG IN */
   #print-area {
     display: block !important;
     visibility: visible !important;
@@ -206,24 +208,28 @@ body {
     visibility: visible !important;
   }
 
-  .contract-paper {
+  .contract-subpage {
     width: 100% !important;
     max-width: 100% !important;
+    min-height: auto !important;
+    height: auto !important;
     margin: 0 !important;
-    padding: 15mm 15mm 15mm 20mm !important;
+    padding: 0 !important; /* Lề trang do @page quản lý chuẩn xác */
     box-shadow: none !important;
     border: none !important;
     page-break-after: always !important;
     break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  .contract-paper:last-child {
+  .contract-subpage:last-child {
     page-break-after: avoid !important;
     break-after: avoid !important;
   }
 
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 15mm 15mm 15mm 20mm; /* Chuẩn: Trên 15mm, Phải 15mm, Dưới 15mm, Trái 20mm */
   }
 }

@@ -1,11 +1,11 @@
 /**
- * HỢP ĐỒNG TỰ ĐỘNG - CORE APPLICATION ENGINE v2.1
- * Đã sửa toàn bộ lỗi:
- * 1. Phân trang chuẩn A4 từng người, không dính liền, không trang trắng thừa
- * 2. Chỉ in đậm {HoVaTen} và {CTV}, tất cả các trường khác giữ nguyên viết thường theo mẫu
- * 3. Chế độ In ẩn toàn bộ Modal/Header/Khung viền, chỉ in đúng văn bản hợp đồng
- * 4. Chức năng Tải về PDF xuất từng trang chuẩn, không bao giờ bị trang trắng
- * 5. Bảng chữ ký inline, mục 3 luôn nằm TRÊN bảng chữ ký đúng mẫu
+ * HỢP ĐỒNG TỰ ĐỘNG - CORE APPLICATION ENGINE v2.2
+ * Cập nhật hoàn chỉnh:
+ * 1. Tên người ký (CTV) IN ĐẬM 100% đúng mẫu
+ * 2. Chia mỗi hợp đồng thành 2 trang A4 chuẩn (.contract-subpage-1 & .contract-subpage-2),
+ *    Điều 1-2 ở Trang 1, Điều 3-6 & Chữ ký ở Trang 2 -> Không bao giờ bị cắt đôi chữ đầu/cuối trang
+ * 3. Tích hợp thư viện jsPDF chuẩn, xuất PDF từng trang A4 chính xác không lỗi
+ * 4. Ẩn toàn bộ thông báo Toast khi in, loại bỏ mọi chữ rác
  */
 
 const state = {
@@ -182,7 +182,6 @@ function parseWorkbookData(workbook) {
   state.selectedSheetName = targetSheetName;
   const worksheet = workbook.Sheets[targetSheetName];
 
-  // raw: false để lấy giá trị chuỗi hiển thị chuẩn (giữ nguyên số 0 ở đầu CCCD, SĐT và giá trị hàm)
   const rawRows = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     raw: false,
@@ -190,10 +189,9 @@ function parseWorkbookData(workbook) {
   });
 
   if (!rawRows || rawRows.length < 2) {
-    throw new Error(`Sheet '${targetSheetName}' không có đủ dữ liệu (cần ít nhất 1 dòng tiêu đề và 1 dòng dữ liệu).`);
+    throw new Error(`Sheet '${targetSheetName}' không có đủ dữ liệu.`);
   }
 
-  // Header dòng 1, lấy từ Cột B trở đi (c >= 1)
   const row1 = rawRows[0];
   const headers = [];
   for (let c = 1; c < row1.length; c++) {
@@ -212,7 +210,6 @@ function parseWorkbookData(workbook) {
   }
   state.headers = headers;
 
-  // Dòng 2 trở đi: Dữ liệu từng người
   const records = [];
   for (let r = 1; r < rawRows.length; r++) {
     const row = rawRows[r];
@@ -400,13 +397,6 @@ function useSampleData() {
 // 4. QUY TẮC ĐIỀN THÔNG TIN & FORMATTING
 // ==========================================
 
-/**
- * Lấy giá trị thay thế:
- * - thulao, congviec, thoihan bỏ trống -> ............................................
- * - ngay, thang, nam, ngaycap bỏ trống -> .....
- * - CHỈ in đậm khi mẫu in đậm (ở HTML: Hovaten và CTV)
- * - Địa chỉ thường trú, CCCD, SĐT, Năm sinh... giữ nguyên viết thường bình thường
- */
 function resolveFieldValue(tag, personData) {
   const normTag = normalizeKey(tag);
   let val = personData[normTag] !== undefined && personData[normTag] !== '' ? personData[normTag] : personData[tag];
@@ -430,10 +420,11 @@ function resolveFieldValue(tag, personData) {
 }
 
 /**
- * Tạo HTML chuẩn cho 1 bản hợp đồng:
- * - QUY TẮC IN ĐẬM CHUẨN XÁC: Chỉ in đậm tên người ở BÊN B và chữ ký {CTV}.
- * - Địa chỉ thường trú, CCCD, SĐT, Năm sinh, Ngày cấp, Nơi cấp KHÔNG in đậm.
- * - Mục 3 của Điều 6 LUÔN NẰM TRÊN bảng chữ ký.
+ * Tạo cấu trúc HTML cho 1 hợp đồng phân tách làm 2 TRANG A4 CHUẨN:
+ * - TRANG 1: Quốc hiệu, Tiêu ngữ, Căn cứ, Bên A, Bên B, Điều 1, Điều 2.
+ * - TRANG 2: Điều 3, Điều 4, Điều 5, Điều 6 (Mục 3 ở trên), Bảng chữ ký 2 bên.
+ * - TÊN KÝ CTV VÀ BÊN A IN ĐẬM VÀ VIẾT HOA CHUẨN XÁC: <b>${ctvName}</b>
+ * - Không bao giờ bị cắt đôi chữ giữa 2 trang!
  */
 function generateContractHTML(person, index) {
   const ngay = resolveFieldValue('Ngay', person);
@@ -460,104 +451,110 @@ function generateContractHTML(person, index) {
   }
 
   return `
-    <div class="contract-paper a4-container" id="contract-person-${index}">
-      <!-- QUỐC HIỆU VÀ TIÊU NGỮ -->
-      <div class="quoc-hieu">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-      <div class="tieu-ngu">Độc lập – Tự do – Hạnh phúc</div>
-      <div class="tieu-ngu-line"></div>
+    <div class="contract-wrapper" id="contract-person-${index}">
+      <!-- ================= TRANG 1 ================= -->
+      <div class="contract-subpage contract-subpage-1 a4-container">
+        <!-- QUỐC HIỆU VÀ TIÊU NGỮ -->
+        <div class="quoc-hieu">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+        <div class="tieu-ngu">Độc lập – Tự do – Hạnh phúc</div>
+        <div class="tieu-ngu-line"></div>
 
-      <!-- ĐỊA DANH NGÀY THÁNG (Không in đậm) -->
-      <div class="ngay-thang-nam">Hà Nội, ngày ${ngay} tháng ${thang} năm ${nam}</div>
+        <!-- ĐỊA DANH NGÀY THÁNG -->
+        <div class="ngay-thang-nam">Hà Nội, ngày ${ngay} tháng ${thang} năm ${nam}</div>
 
-      <!-- TÊN HỢP ĐỒNG & SỐ -->
-      <div class="ten-hop-dong">HỢP ĐỒNG CỘNG TÁC VIÊN</div>
-      <div class="so-ky-hieu">Số: ……/2026/HĐCTV</div>
+        <!-- TÊN HỢP ĐỒNG & SỐ -->
+        <div class="ten-hop-dong">HỢP ĐỒNG CỘNG TÁC VIÊN</div>
+        <div class="so-ky-hieu">Số: ……/2026/HĐCTV</div>
 
-      <!-- CĂN CỨ -->
-      <div style="margin-top: 10pt; margin-bottom: 8pt;">
-        <p class="can-cu">Căn cứ Bộ luật Dân sự nước Cộng hòa xã hội chủ nghĩa Việt Nam ngày 24/11/2015;</p>
-        <p class="can-cu">Căn cứ nhu cầu và năng lực của hai bên,</p>
-        <p class="paragraph-justify" style="margin-top: 6pt;">
-          Hợp đồng cộng tác viên này (sau đây gọi là “Hợp đồng”) được xem là hợp đồng dịch vụ được ký kết tại Công ty cổ phần đào tạo tư vấn và phát triển ABA và bởi các bên:
-        </p>
+        <!-- CĂN CỨ -->
+        <div style="margin-top: 10pt; margin-bottom: 8pt;">
+          <p class="can-cu">Căn cứ Bộ luật Dân sự nước Cộng hòa xã hội chủ nghĩa Việt Nam ngày 24/11/2015;</p>
+          <p class="can-cu">Căn cứ nhu cầu và năng lực của hai bên,</p>
+          <p class="paragraph-justify" style="margin-top: 6pt;">
+            Hợp đồng cộng tác viên này (sau đây gọi là “Hợp đồng”) được xem là hợp đồng dịch vụ được ký kết tại Công ty cổ phần đào tạo tư vấn và phát triển ABA và bởi các bên:
+          </p>
+        </div>
+
+        <!-- BÊN A -->
+        <div style="margin-bottom: 8pt;">
+          <p class="paragraph-justify"><b>BÊN THUÊ DỊCH VỤ (BÊN A): CÔNG TY CỔ PHẦN ĐÀO TẠO TƯ VẤN VÀ PHÁT TRIỂN ABA</b></p>
+          <p class="paragraph-justify">Địa chỉ: Số 33 Linh Lang, Phường Ngọc Hà, Thành Phố Hà Nội</p>
+          <p class="paragraph-justify">Mã số thuế: 0105261305</p>
+          <p class="paragraph-justify">Đại diện: Ông <b>Dương Đức Nam</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Chức vụ: <b>Giám Đốc</b></p>
+        </div>
+
+        <!-- BÊN B (CỘNG TÁC VIÊN) - CHỈ IN ĐẬM TÊN THEO MẪU WORD -->
+        <div style="margin-bottom: 10pt;">
+          <p class="paragraph-justify"><b>BÊN CỘNG TÁC VIÊN (BÊN B): <span class="font-bold">${hovaten}</span></b></p>
+          <p class="paragraph-justify">Năm sinh: ${namsinh} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Giới tính: Nam / Nữ</p>
+          <p class="paragraph-justify">Địa chỉ thường trú: ${thuongtru}</p>
+          <p class="paragraph-justify">Số CCCD: ${cccd} &nbsp;&nbsp;&nbsp;&nbsp; Ngày cấp: ${ngaycap} &nbsp;&nbsp;&nbsp;&nbsp; Nơi cấp: ${noicap}</p>
+          <p class="paragraph-justify">Điện thoại: ${sdt}</p>
+        </div>
+
+        <p class="paragraph-justify" style="margin-bottom: 8pt;">Sau khi thỏa thuận, hai bên nhất trí ký kết hợp đồng với các điều khoản như sau:</p>
+
+        <!-- ĐIỀU 1 -->
+        <div class="dieu-khoan-title">Điều 1: Nội dung và thời hạn công việc</div>
+        <p class="paragraph-justify">Bên A đồng ý thuê và bên B đồng ý làm Cộng tác viên thực hiện các công việc sau:</p>
+        <p class="paragraph-justify">1. Nội dung công việc: &nbsp;${congviec}</p>
+        <p class="paragraph-justify">2. Thời hạn thực hiện: &nbsp;${thoihan}</p>
+        <p class="paragraph-justify">3. Địa điểm: Theo thỏa thuận cụ thể của từng đầu việc</p>
+        <p class="paragraph-justify">4. Thiết bị và công cụ làm việc sẽ được cấp phát tùy theo nhu cầu của công việc</p>
+
+        <!-- ĐIỀU 2 -->
+        <div class="dieu-khoan-title">Điều 2: Thù lao và phương thức thanh toán</div>
+        <p class="paragraph-justify">1. Thù lao: &nbsp;${thulao}</p>
+        <p class="paragraph-justify">Thuế thu nhập cá nhân do người lao động tự quyết toán</p>
+        <p class="paragraph-justify">2. Phương thức thanh toán: Chuyển khoản hoặc Tiền mặt.</p>
+        <p class="paragraph-justify">3. Thời hạn thanh toán: Sau khi hoàn thành công việc 15 ngày</p>
       </div>
 
-      <!-- BÊN A -->
-      <div style="margin-bottom: 8pt;">
-        <p class="paragraph-justify"><b>BÊN THUÊ DỊCH VỤ (BÊN A: CÔNG TY CỔ PHẦN ĐÀO TẠO TƯ VẤN VÀ PHÁT TRIỂN ABA</b></p>
-        <p class="paragraph-justify">Địa chỉ: Số 33 Linh Lang, Phường Ngọc Hà, Thành Phố Hà Nội</p>
-        <p class="paragraph-justify">Mã số thuế: 0105261305</p>
-        <p class="paragraph-justify">Đại diện: Ông <b>Dương Đức Nam</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Chức vụ: <b>Giám Đốc</b></p>
+      <!-- ================= TRANG 2 ================= -->
+      <div class="contract-subpage contract-subpage-2 a4-container">
+        <!-- ĐIỀU 3 (BẮT ĐẦU TRANG 2 SẠCH ĐẸP) -->
+        <div class="dieu-khoan-title" style="margin-top: 0;">Điều 3: Quyền và nghĩa vụ của bên A</div>
+        <p class="paragraph-justify">1. Yêu cầu cộng tác viên thực hiện công việc theo đúng chất lượng, số lượng, thời hạn, địa điểm và các thỏa thuận khác.</p>
+        <p class="paragraph-justify">2. Cung cấp cho cộng tác viên thông tin, tài liệu và các phương tiện cần thiết để thực hiện công việc. Bảo đảm việc làm cho cộng tác viên theo Hợp đồng đã ký</p>
+        <p class="paragraph-justify">3. Thanh toán tiền đầy đủ và đúng hạn cho cộng tác viên</p>
+        <p class="paragraph-justify">4. Có quyền tạm dừng thanh toán nếu Bên B chưa hoàn thành công việc theo cam kết hoặc chưa hoàn trả đầy đủ tài sản của công ty.</p>
+        <p class="paragraph-justify">5. Đơn phương chấm dứt hợp đồng và yêu cầu bồi thường nếu Bên B vi phạm nghiêm trọng các cam kết về chất lượng và bảo mật</p>
+
+        <!-- ĐIỀU 4 -->
+        <div class="dieu-khoan-title">Điều 4: Quyền và nghĩa vụ của bên B</div>
+        <p class="paragraph-justify">1. Thực hiện công việc đúng chất lượng, số lượng, thời hạn, địa điểm và các thoả thuận khác.</p>
+        <p class="paragraph-justify">2. Tự chịu trách nhiệm về phương tiện (nếu không được cấp) và cách thức tổ chức công việc để đạt kết quả</p>
+        <p class="paragraph-justify">3. Giữ bí mật tuyệt đối các thông tin kinh doanh, tài liệu của Bên A trong và sau quá trình thực hiện công việc.</p>
+        <p class="paragraph-justify">4. Hoàn trả lại toàn bộ tài liệu, thiết bị được cấp phát ngay sau khi kết thúc công việc hoặc chấm dứt hợp đồng</p>
+        <p class="paragraph-justify">5. Bồi thường thiệt hại cho bên A nếu làm mất, hư hỏng tài liệu, phương tiện được giao hoặc tiết lộ bí mật thông tin.</p>
+
+        <!-- ĐIỀU 5 -->
+        <div class="dieu-khoan-title">Điều 5: Chấm dứt hợp đồng</div>
+        <p class="paragraph-justify">1. Hợp đồng đương nhiên chấm dứt khi hết thời hạn quy định tại Điều 1.</p>
+        <p class="paragraph-justify">2. Mỗi bên có quyền đơn phương chấm dứt hợp đồng trước thời hạn nhưng phải thông báo bằng văn bản cho bên kia trước ít nhất 05 ngày.</p>
+
+        <!-- ĐIỀU 6 - MỤC 3 NẰM TRÊN BẢNG CHỮ KÝ -->
+        <div class="dieu-khoan-title">Điều 6: Điều khoản chung</div>
+        <p class="paragraph-justify">1. Hợp đồng này là hợp đồng dân sự, không xác lập quan hệ lao động, không thuộc đối tượng đóng Bảo hiểm xã hội bắt buộc</p>
+        <p class="paragraph-justify">2. Mọi tranh chấp phát sinh sẽ được ưu tiên giải quyết qua thương lượng. Trường hợp không thỏa thuận được, tranh chấp sẽ được giải quyết tại Tòa án có thẩm quyền.</p>
+        <p class="paragraph-justify">3. Hợp đồng được lập thành 02 (hai) bản có giá trị pháp lý như nhau, mỗi bên giữ 01 (một) bản</p>
+
+        <!-- BẢNG CHỮ KÝ 2 CỘT: TÊN KÝ IN ĐẬM VÀ VIẾT HOA CHUẨN XÁC -->
+        <table class="table-chu-ky">
+          <tr>
+            <td>
+              <div class="chu-ky-title">CỘNG TÁC VIÊN</div>
+              <div class="chu-ky-ghi-chu">(Ký, ghi rõ họ tên)</div>
+              <div class="chu-ky-ho-ten font-bold"><b>${ctvName}</b></div>
+            </td>
+            <td>
+              <div class="chu-ky-title">ĐẠI DIỆN BÊN SỬ DỤNG DỊCH VỤ</div>
+              <div class="chu-ky-ghi-chu">(Ký, ghi rõ họ tên)</div>
+              <div class="chu-ky-ho-ten font-bold"><b>DƯƠNG ĐỨC NAM</b></div>
+            </td>
+          </tr>
+        </table>
       </div>
-
-      <!-- BÊN B (CỘNG TÁC VIÊN) - CHỈ IN ĐẬM TÊN THEO MẪU WORD GỐC -->
-      <div style="margin-bottom: 10pt;">
-        <p class="paragraph-justify"><b>BÊN CỘNG TÁC VIÊN (BÊN B): <span class="font-bold">${hovaten}</span></b></p>
-        <p class="paragraph-justify">Năm sinh: ${namsinh} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Giới tính: Nam / Nữ</p>
-        <p class="paragraph-justify">Địa chỉ thường trú: ${thuongtru}</p>
-        <p class="paragraph-justify">Số CCCD: ${cccd} &nbsp;&nbsp;&nbsp;&nbsp; Ngày cấp: ${ngaycap} &nbsp;&nbsp;&nbsp;&nbsp; Nơi cấp: ${noicap}</p>
-        <p class="paragraph-justify">Điện thoại: ${sdt}</p>
-      </div>
-
-      <p class="paragraph-justify" style="margin-bottom: 8pt;">Sau khi thỏa thuận, hai bên nhất trí ký kết hợp đồng với các điều khoản như sau:</p>
-
-      <!-- ĐIỀU 1 -->
-      <div class="dieu-khoan-title">Điều 1: Nội dung và thời hạn công việc</div>
-      <p class="paragraph-justify">Bên A đồng ý thuê và bên B đồng ý làm Cộng tác viên thực hiện các công việc sau:</p>
-      <p class="paragraph-justify">1. Nội dung công việc: &nbsp;${congviec}</p>
-      <p class="paragraph-justify">2. Thời hạn thực hiện: &nbsp;${thoihan}</p>
-      <p class="paragraph-justify">3. Địa điểm: Theo thỏa thuận cụ thể của từng đầu việc</p>
-      <p class="paragraph-justify">4. Thiết bị và công cụ làm việc sẽ được cấp phát tùy theo nhu cầu của công việc</p>
-
-      <!-- ĐIỀU 2 -->
-      <div class="dieu-khoan-title">Điều 2: Thù lao và phương thức thanh toán</div>
-      <p class="paragraph-justify">1. Thù lao: &nbsp;${thulao}</p>
-      <p class="paragraph-justify">Thuế thu nhập cá nhân do người lao động tự quyết toán</p>
-      <p class="paragraph-justify">2. Phương thức thanh toán: Chuyển khoản hoặc Tiền mặt.</p>
-      <p class="paragraph-justify">3. Thời hạn thanh toán: Sau khi hoàn thành công việc 15 ngày</p>
-
-      <!-- ĐIỀU 3 -->
-      <div class="dieu-khoan-title">Điều 3: Quyền và nghĩa vụ của bên A</div>
-      <p class="paragraph-justify">1. Yêu cầu cộng tác viên thực hiện công việc theo đúng chất lượng, số lượng, thời hạn, địa điểm và các thỏa thuận khác.</p>
-      <p class="paragraph-justify">2. Cung cấp cho cộng tác viên thông tin, tài liệu và các phương tiện cần thiết để thực hiện công việc. Bảo đảm việc làm cho cộng tác viên theo Hợp đồng đã ký</p>
-      <p class="paragraph-justify">3. Thanh toán tiền đầy đủ và đúng hạn cho cộng tác viên</p>
-      <p class="paragraph-justify">4. Có quyền tạm dừng thanh toán nếu Bên B chưa hoàn thành công việc theo cam kết hoặc chưa hoàn trả đầy đủ tài sản của công ty.</p>
-      <p class="paragraph-justify">5. Đơn phương chấm dứt hợp đồng và yêu cầu bồi thường nếu Bên B vi phạm nghiêm trọng các cam kết về chất lượng và bảo mật</p>
-
-      <!-- ĐIỀU 4 -->
-      <div class="dieu-khoan-title">Điều 4: Quyền và nghĩa vụ của bên B</div>
-      <p class="paragraph-justify">1. Thực hiện công việc đúng chất lượng, số lượng, thời hạn, địa điểm và các thoả thuận khác.</p>
-      <p class="paragraph-justify">2. Tự chịu trách nhiệm về phương tiện (nếu không được cấp) và cách thức tổ chức công việc để đạt kết quả</p>
-      <p class="paragraph-justify">3. Giữ bí mật tuyệt đối các thông tin kinh doanh, tài liệu của Bên A trong và sau quá trình thực hiện công việc.</p>
-      <p class="paragraph-justify">4. Hoàn trả lại toàn bộ tài liệu, thiết bị được cấp phát ngay sau khi kết thúc công việc hoặc chấm dứt hợp đồng</p>
-      <p class="paragraph-justify">5. Bồi thường thiệt hại cho bên A nếu làm mất, hư hỏng tài liệu, phương tiện được giao hoặc tiết lộ bí mật thông tin.</p>
-
-      <!-- ĐIỀU 5 -->
-      <div class="dieu-khoan-title">Điều 5: Chấm dứt hợp đồng</div>
-      <p class="paragraph-justify">1. Hợp đồng đương nhiên chấm dứt khi hết thời hạn quy định tại Điều 1.</p>
-      <p class="paragraph-justify">2. Mỗi bên có quyền đơn phương chấm dứt hợp đồng trước thời hạn nhưng phải thông báo bằng văn bản cho bên kia trước ít nhất 05 ngày.</p>
-
-      <!-- ĐIỀU 6 - MỤC 3 LUÔN NẰM TRÊN BẢNG CHỮ KÝ -->
-      <div class="dieu-khoan-title">Điều 6: Điều khoản chung</div>
-      <p class="paragraph-justify">1. Hợp đồng này là hợp đồng dân sự, không xác lập quan hệ lao động, không thuộc đối tượng đóng Bảo hiểm xã hội bắt buộc</p>
-      <p class="paragraph-justify">2. Mọi tranh chấp phát sinh sẽ được ưu tiên giải quyết qua thương lượng. Trường hợp không thỏa thuận được, tranh chấp sẽ được giải quyết tại Tòa án có thẩm quyền.</p>
-      <p class="paragraph-justify">3. Hợp đồng được lập thành 02 (hai) bản có giá trị pháp lý như nhau, mỗi bên giữ 01 (một) bản</p>
-
-      <!-- BẢNG CHỮ KÝ INLINE ĐẶT DƯỚI MỤC 3 -->
-      <table class="table-chu-ky">
-        <tr>
-          <td>
-            <div class="chu-ky-title">CỘNG TÁC VIÊN</div>
-            <div class="chu-ky-ghi-chu">(Ký, ghi rõ họ tên)</div>
-            <div class="chu-ky-ho-ten">${ctvName}</div>
-          </td>
-          <td>
-            <div class="chu-ky-title">ĐẠI DIỆN BÊN SỬ DỤNG DỊCH VỤ</div>
-            <div class="chu-ky-ghi-chu">(Ký, ghi rõ họ tên)</div>
-            <div class="chu-ky-ho-ten">DƯƠNG ĐỨC NAM</div>
-          </td>
-        </tr>
-      </table>
     </div>
   `;
 }
@@ -642,13 +639,14 @@ function closeCompletionModal() {
 
 /**
  * CHỨC NĂNG IN CHUẨN:
- * 1. Ẩn toàn bộ modal, giao diện, thanh tiêu đề
- * 2. Kích hoạt lệnh window.print() trên vùng #print-area sạch sẽ
- * 3. Mỗi người tự động ngắt thành các trang riêng biệt
- * 4. Khôi phục lại trạng thái giao diện sau khi in
+ * - Ẩn modal và XÓA TOÀN BỘ thông báo Toast trên màn hình trước khi gọi in
+ * - Mỗi trang con (.contract-subpage) in đúng 1 trang A4
+ * - Sau khi in đóng lại thì khôi phục modal
  */
 function triggerPrint() {
-  // Đóng modal để không bị dính vào bản in
+  // Xóa toàn bộ toast đang có trên màn hình để không bị in ra giấy
+  document.querySelectorAll('.toast-alert, .no-print-toast').forEach(el => el.remove());
+
   const completionModal = document.getElementById('completion-modal');
   const previewModal = document.getElementById('preview-modal');
   const wasCompletionOpen = completionModal && !completionModal.classList.contains('hidden');
@@ -663,11 +661,9 @@ function triggerPrint() {
     previewModal.classList.remove('flex');
   }
 
-  // Đảm bảo DOM cập nhật trước khi gọi in
   setTimeout(() => {
     window.print();
 
-    // Mở lại modal sau khi hộp thoại in đóng
     setTimeout(() => {
       if (wasPreviewOpen && previewModal) {
         previewModal.classList.remove('hidden');
@@ -676,19 +672,19 @@ function triggerPrint() {
         completionModal.classList.remove('hidden');
         completionModal.classList.add('flex');
       }
-    }, 500);
-  }, 150);
+    }, 400);
+  }, 100);
 }
 
 /**
- * CHỨC NĂNG TẢI VỀ PDF CHUẨN XUẤT SẮC (KHÔNG BAO GIỜ BỊ TRẮNG):
- * - Tạo PDF từng trang / từng hợp đồng qua jsPDF + html2canvas
- * - Không bị giới hạn chiều cao Canvas của trình duyệt
- * - Có thanh thông báo tiến độ xuất PDF từng người
+ * CHỨC NĂNG TẢI VỀ PDF CHUẨN XUẤT SẮC:
+ * - Dùng jsPDF từ thư viện jspdf.umd.min.js
+ * - Render từng trang .contract-subpage chuẩn A4 (210x297mm)
+ * - Mỗi hợp đồng đúng 2 trang A4, không lỗi bộ nhớ, không trang trắng
  */
 async function triggerDownloadPDF() {
-  const contracts = document.querySelectorAll('#print-area .contract-paper');
-  if (!contracts || contracts.length === 0) {
+  const pages = document.querySelectorAll('#print-area .contract-subpage');
+  if (!pages || pages.length === 0) {
     showToast("Chưa có hợp đồng nào được tạo.", "error");
     return;
   }
@@ -700,55 +696,40 @@ async function triggerDownloadPDF() {
   }
 
   try {
-    const { jsPDF } = window.jspdf || window;
-    if (!jsPDF) {
-      throw new Error("Không tìm thấy thư viện jsPDF");
+    const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!jsPDFClass) {
+      throw new Error("Không tìm thấy thư viện jsPDF. Vui lòng tải lại trang.");
     }
 
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
-    const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
+    const pdf = new jsPDFClass('p', 'mm', 'a4');
+    const pdfWidth = 210;
+    const pdfHeight = 297;
 
-    let isFirstPage = true;
-
-    for (let i = 0; i < contracts.length; i++) {
+    for (let i = 0; i < pages.length; i++) {
       if (btnDownload) {
-        btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xuất PDF người ${i + 1}/${contracts.length}...`;
+        btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xuất trang ${i + 1}/${pages.length}...`;
       }
 
-      const contractEl = contracts[i];
-      // Clone element ra ngoài để render canvas không bị ảnh hưởng bởi scroll/fixed
-      const canvas = await html2canvas(contractEl, {
+      const pageEl = pages[i];
+      const canvas = await html2canvas(pageEl, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff'
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const imgProps = pdf.getImageProperties(imgData);
-      const totalImgHeightMm = (imgProps.height * pdfWidth) / imgProps.width;
+      const imgData = canvas.toDataURL('image/jpeg', 0.96);
 
-      // Chia nhỏ thành các trang A4 nếu hợp đồng dài hơn 1 trang
-      let remainingHeightMm = totalImgHeightMm;
-      let positionMm = 0;
-
-      while (remainingHeightMm > 5) {
-        if (!isFirstPage) {
-          pdf.addPage();
-        }
-        isFirstPage = false;
-
-        pdf.addImage(imgData, 'JPEG', 0, positionMm, pdfWidth, totalImgHeightMm);
-        remainingHeightMm -= pdfHeight;
-        positionMm -= pdfHeight;
+      if (i > 0) {
+        pdf.addPage('a4', 'p');
       }
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
 
-      await new Promise(r => setTimeout(r, 15));
+      await new Promise(r => setTimeout(r, 10));
     }
 
-    pdf.save(`HopDong_TongHop_${contracts.length}_nguoi.pdf`);
-    showToast("Đã tải về toàn bộ file PDF gộp thành công!", "success");
+    pdf.save(`HopDong_TongHop_${state.excelData.length}_nguoi.pdf`);
+    showToast("Đã xuất và tải về file PDF thành công!", "success");
   } catch (err) {
     console.error("Lỗi xuất PDF:", err);
     showToast("Gặp trục trặc khi tạo PDF: " + err.message + ". Bạn có thể nhấn 'In ngay' và chọn 'Lưu dưới dạng PDF' với chất lượng vector tuyệt đối!", "info");
@@ -813,7 +794,7 @@ function showToast(message, type = 'info') {
     info: 'fa-circle-info'
   };
 
-  toast.className = `fixed bottom-5 right-5 z-50 flex items-center px-4 py-3 rounded-lg shadow-xl text-sm font-medium transition-all duration-300 transform translate-y-5 opacity-0 ${bgColors[type] || bgColors.info}`;
+  toast.className = `no-print toast-alert no-print-toast fixed bottom-5 right-5 z-50 flex items-center px-4 py-3 rounded-lg shadow-xl text-sm font-medium transition-all duration-300 transform translate-y-5 opacity-0 ${bgColors[type] || bgColors.info}`;
   toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} mr-2 text-base"></i> <span>${message}</span>`;
   document.body.appendChild(toast);
 
