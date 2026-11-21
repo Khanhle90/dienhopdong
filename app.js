@@ -701,17 +701,24 @@ async function triggerDownloadPDF() {
       throw new Error("Không tìm thấy thư viện jsPDF. Vui lòng tải lại trang.");
     }
 
+    const html2canvasFunc = window.html2canvas || (typeof html2canvas !== 'undefined' ? html2canvas : null);
+    if (!html2canvasFunc) {
+      throw new Error("Không tìm thấy thư viện html2canvas. Vui lòng tải lại trang.");
+    }
+
     const pdf = new jsPDFClass('p', 'mm', 'a4');
     const pdfWidth = 210;
     const pdfHeight = 297;
 
     for (let i = 0; i < pages.length; i++) {
       if (btnDownload) {
-        btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xuất trang ${i + 1}/${pages.length}...`;
+        const hdn = Math.floor(i / 2) + 1;
+        const subPage = (i % 2) + 1;
+        btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xuất HĐ ${hdn}/${state.excelData.length} (Trang ${subPage}/2)...`;
       }
 
       const pageEl = pages[i];
-      const canvas = await html2canvas(pageEl, {
+      const canvas = await html2canvasFunc(pageEl, {
         scale: 2,
         useCORS: true,
         logging: false,

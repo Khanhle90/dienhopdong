@@ -12,11 +12,18 @@
   <!-- CSS Tùy biến & Quy cách in A4 -->
   <link rel="stylesheet" href="style.css">
 
-  <!-- Thư viện xử lý Excel, Word và PDF (Ưu tiên tệp nội bộ, fallback CDN) -->
+  <!-- Thư viện xử lý Excel, Word và PDF (Ưu tiên tệp nội bộ, tự động fallback CDN) -->
   <script src="lib/xlsx.full.min.js"></script>
+  <script>window.XLSX || document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>')</script>
+
   <script src="lib/jszip.min.js"></script>
+  <script>window.JSZip || document.write('<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"><\/script>')</script>
+
   <script src="lib/jspdf.umd.min.js"></script>
-  <script src="lib/html2pdf.bundle.min.js"></script>
+  <script>window.jspdf || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>')</script>
+
+  <script src="lib/html2canvas.min.js"></script>
+  <script>window.html2canvas || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>')</script>
 
   <!-- Dữ liệu mẫu Base64 & Sample Data -->
   <script src="default_template_b64.js"></script>
