@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phần Mềm Tự Động Điền Hợp Đồng Từ Excel Sang Word & PDF</title>
+  
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- CSS Tùy biến & Quy cách in A4 -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Thư viện xử lý Excel, Word và PDF (Ưu tiên tệp nội bộ, fallback CDN) -->
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="lib/jszip.min.js"></script>
+  <script src="lib/html2pdf.bundle.min.js"></script>
+
+  <!-- Dữ liệu mẫu Base64 & Sample Data -->
+  <script src="default_template_b64.js"></script>
+  <script src="sample_data.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 antialiased flex flex-col">
+
+  <!-- ================= HEADER CHÍNH ================= -->
+  <header class="no-print bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i class="fa-solid fa-file-signature text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">HỢP ĐỒNG TỰ ĐỘNG</h1>
+          <p class="text-xs text-slate-500 font-medium">Xuất PDF nối trang chuẩn quy cách &bull; Chạy trực tiếp trên GitHub</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center space-x-2">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+          GitHub Pages Ready
+        </span>
+        <span class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <i class="fa-solid fa-shield-halved mr-1 text-blue-600"></i>
+          Bảo mật 100% tại máy
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= NỘI DUNG CHÍNH (NO-PRINT) ================= -->
+  <main class="no-print flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- BANNER GIỚI THIỆU NHANH -->
+    <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 p-6 sm:p-8 text-white shadow-xl">
+      <div class="relative z-10 max-w-3xl">
+        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold mb-3 border border-blue-400/30">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>Tự động hóa thông minh từ Excel & Google Sheet</span>
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">Điền hàng trăm hợp đồng chỉ với 1 cú click</h2>
+        <p class="text-sm sm:text-base text-slate-300 leading-relaxed">
+          Tự động lấy thông tin từ cột tương ứng (từ Cột B trở đi) điền vào các vị trí <code>{tên_cột}</code> trên mẫu Word. Giữ nguyên số 0 ở đầu (CCCD, SĐT), bôi đen/viết hoa theo mẫu, tự động điền dấu chấm vào ô trống và xuất file PDF nối liền các trang không có trang trắng thừa!
+        </p>
+      </div>
+      <div class="absolute -right-10 -bottom-10 opacity-10 text-9xl text-white pointer-events-none">
+        <i class="fa-solid fa-file-contract"></i>
+      </div>
+    </div>
+
+    <!-- KHỐI 2 CỘT: CỘT 1 (MẪU WORD) & CỘT 2 (DỮ LIỆU EXCEL/GSHEET) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+      <!-- CỘT 1: QUẢN LÝ MẪU HỢP ĐỒNG WORD -->
+      <div class="glass-card rounded-2xl p-6 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2.5">
+              <span class="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm">1</span>
+              <h3 class="text-base font-bold text-slate-900">Mẫu hợp đồng Word (.docx)</h3>
+            </div>
+            <span class="text-xs px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md font-medium">Có thể thay thế mẫu</span>
+          </div>
+
+          <!-- Thông tin mẫu đang dùng -->
+          <div id="template-info" class="mb-4">
+            <div class="p-4 bg-slate-100 rounded-lg animate-pulse text-xs text-slate-500">Đang tải mẫu mặc định...</div>
+          </div>
+
+          <!-- Drag and drop zone thay thế mẫu -->
+          <div id="template-dropzone" class="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-blue-50/50 rounded-xl p-5 text-center cursor-pointer transition group">
+            <input type="file" id="template-file-input" accept=".docx" class="hidden">
+            <div class="w-10 h-10 mx-auto rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-110 transition">
+              <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            </div>
+            <p class="text-sm font-semibold text-slate-700 group-hover:text-blue-700">Kéo thả hoặc bấm để thay mẫu Word khác</p>
+            <p class="text-xs text-slate-400 mt-1">Hỗ trợ định dạng .docx (Các trường đánh dấu định dạng <code>{tên_cột}</code>)</p>
+          </div>
+
+          <!-- Danh sách placeholder đã quét được -->
+          <div class="mt-4">
+            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Các trường nhận diện trong mẫu:</label>
+            <div id="placeholder-badges" class="flex flex-wrap max-h-24 overflow-y-auto p-2 bg-slate-50 rounded-lg border border-slate-200">
+              <span class="text-xs text-slate-400 italic">Đang quét các trường...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center">
+          <i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i>
+          <span>Mẫu mặc định chuẩn: <b>Hợp đồng Cộng tác viên ABA</b>. Bạn có thể tải mẫu về để chỉnh sửa hoặc thay thế mẫu mới bất kỳ lúc nào.</span>
+        </div>
+      </div>
+
+      <!-- CỘT 2: NGUỒN DỮ LIỆU (EXCEL / GOOGLE SHEETS) -->
+      <div class="glass-card rounded-2xl p-6 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2.5">
+              <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-sm">2</span>
+              <h3 class="text-base font-bold text-slate-900">Dữ liệu nguồn (Excel / Google Sheet)</h3>
+            </div>
+            <button onclick="useSampleData()" class="px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md border border-indigo-200 transition shadow-sm">
+              <i class="fa-solid fa-bolt mr-1"></i> Thử dữ liệu mẫu (27 người)
+            </button>
+          </div>
+
+          <!-- Tabs chọn nguồn -->
+          <div class="flex border-b border-slate-200 mb-4">
+            <button id="tab-excel" class="px-4 py-2 text-sm font-semibold text-blue-600 border-b-2 border-blue-600 flex items-center">
+              <i class="fa-solid fa-file-excel mr-2 text-emerald-600"></i> File Excel (.xlsx, .xls, .csv)
+            </button>
+            <button id="tab-gsheet" class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 flex items-center">
+              <i class="fa-solid fa-table mr-2 text-green-600"></i> Link Google Sheet
+            </button>
+          </div>
+
+          <!-- Panel 1: Upload Excel File -->
+          <div id="panel-excel">
+            <div id="excel-dropzone" class="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/50 rounded-xl p-6 text-center cursor-pointer transition group">
+              <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="hidden">
+              <div class="w-12 h-12 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2 group-hover:scale-110 transition">
+                <i class="fa-solid fa-file-excel text-xl"></i>
+              </div>
+              <p class="text-sm font-semibold text-slate-700 group-hover:text-emerald-700">Kéo thả file Excel vào đây hoặc bấm để chọn</p>
+              <p class="text-xs text-slate-400 mt-1">Đọc Sheet mặc định: <b>Thông tin</b> &bull; Dự phòng: <b>Sheet 1</b></p>
+            </div>
+          </div>
+
+          <!-- Panel 2: Nhập link Google Sheet -->
+          <div id="panel-gsheet" class="hidden space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Dán link bảng tính Google Sheet:</label>
+              <div class="flex space-x-2">
+                <input type="url" id="input-gsheet-url" placeholder="https://docs.google.com/spreadsheets/d/.../edit" class="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <button id="btn-fetch-gsheet" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition whitespace-nowrap">
+                  <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Tải dữ liệu
+                </button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200 leading-relaxed">
+              <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> <b>Lưu ý:</b> Bảng tính Google Sheet cần được mở quyền: <i>Chia sẻ &rarr; Bất kỳ ai có đường liên kết đều có thể xem</i>. Tên sheet cần xử lý là <b>Thông tin</b> hoặc <b>Sheet 1</b>.
+            </p>
+          </div>
+
+          <!-- Trạng thái nhận diện Sheet và dữ liệu -->
+          <div id="data-status-container" class="mt-4">
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 text-center">
+              Chưa nạp dữ liệu. Vui lòng kéo thả file Excel hoặc dán link Google Sheet.
+            </div>
+          </div>
+
+          <!-- Bảng xem trước dữ liệu nhanh -->
+          <div id="data-preview-table"></div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+          <span><i class="fa-solid fa-check text-emerald-500 mr-1"></i> Cột B trở đi &bull; Hàng 1 làm định danh &bull; Hàng 2 dữ liệu</span>
+          <span class="text-blue-600 font-medium">Bảo toàn số 0 ở đầu</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- KHỐI 3: QUY TẮC ĐIỀN THÔNG TIN & TÙY CHỌN -->
+    <div class="glass-card rounded-2xl p-6">
+      <div class="flex items-center space-x-2.5 mb-4">
+        <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm">3</span>
+        <h3 class="text-base font-bold text-slate-900">Quy tắc tự động hóa được áp dụng</h3>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-start space-x-3">
+          <div class="p-2 bg-blue-100 text-blue-700 rounded-lg mt-0.5">
+            <i class="fa-solid fa-font"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-800 mb-1">Định dạng & Viết hoa</h4>
+            <p class="text-slate-600 leading-relaxed">Vị trí thay thế bôi đen thì tự động bôi đen. Vị trí thay thế viết hoa (như <code>{CTV}</code>) thì tự động viết hoa tên.</p>
+          </div>
+        </div>
+
+        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-start space-x-3">
+          <div class="p-2 bg-emerald-100 text-emerald-700 rounded-lg mt-0.5">
+            <i class="fa-solid fa-hashtag"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-800 mb-1">Giữ nguyên số 0 & Hàm</h4>
+            <p class="text-slate-600 leading-relaxed">Tuyệt đối không bỏ số 0 ở đầu CCCD (<code>0012...</code>), Số điện thoại (<code>0978...</code>). Tự động lấy chuẩn giá trị hiển thị từ các hàm Excel.</p>
+          </div>
+        </div>
+
+        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-start space-x-3">
+          <div class="p-2 bg-amber-100 text-amber-700 rounded-lg mt-0.5">
+            <i class="fa-solid fa-ellipsis"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-800 mb-1">Tự động điền ô trống</h4>
+            <p class="text-slate-600 leading-relaxed">Ô <code>thulao</code>, <code>congviec</code>, <code>thoihan</code> trống &rarr; điền <code>....(44 chấm)</code>. Ô <code>ngay</code>, <code>thang</code>, <code>nam</code> trống &rarr; điền <code>.....</code>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KHỐI 4: NÚT THỰC HIỆN & TIẾN ĐỘ -->
+    <div class="glass-card rounded-2xl p-6 text-center space-y-4">
+      <div class="max-w-xl mx-auto">
+        <button id="btn-start-process" disabled class="w-full py-4 px-8 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl shadow-lg shadow-blue-500/25 disabled:shadow-none transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center">
+          <i class="fa-solid fa-bolt mr-2"></i> Bắt đầu tạo Hợp đồng
+        </button>
+        <p class="text-xs text-slate-400 mt-2">Mỗi người tương ứng 1 hợp đồng riêng biệt &bull; Tự động ghép nối liên tục &bull; Bỏ trang trắng không có text</p>
+      </div>
+
+      <!-- THANH TIẾN ĐỘ TRỰC QUAN -->
+      <div id="progress-section" class="hidden max-w-2xl mx-auto pt-4 text-left">
+        <div class="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+          <span id="progress-text">Đang chuẩn bị dữ liệu...</span>
+          <span id="progress-percent" class="text-blue-600 font-mono text-sm">0%</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-3.5 overflow-hidden p-0.5 border border-slate-300">
+          <div id="progress-bar" class="bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full transition-all duration-150 progress-bar-striped" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="no-print mt-auto py-6 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 space-y-1">
+      <p class="font-medium text-slate-700">Phần Mềm Tự Động Điền Hợp Đồng & Xuất PDF Nối Tiếp &bull; Bản quyền Công ty CP Đào Tạo Tư Vấn và Phát Triển ABA</p>
+      <p>Ứng dụng chạy trực tiếp trên GitHub Pages &bull; Hỗ trợ mọi trình duyệt (Chrome, Edge, Cốc Cốc, Safari, Firefox)</p>
+    </div>
+  </footer>
+
+  <!-- ================= MODAL THÔNG BÁO HOÀN THÀNH ================= -->
+  <div id="completion-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl modal-animate-in border border-slate-100 text-center space-y-5">
+      <div class="w-16 h-16 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl shadow-inner">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+
+      <div>
+        <h3 class="text-xl font-extrabold text-slate-900">Đã Hoàn Thành Xử Lý!</h3>
+        <p class="text-sm text-slate-500 mt-1">Đã tạo thành công <span id="modal-completed-count" class="font-bold text-emerald-600">0 hợp đồng</span> theo thứ tự bảng Excel.</p>
+        <p class="text-xs text-slate-400 mt-1">Các hợp đồng đã được nối tiếp liên tục, giữ nguyên định dạng Word và loại bỏ các trang trắng thừa.</p>
+      </div>
+
+      <!-- NÚT CHỨC NĂNG CHÍNH THEO YÊU CẦU: IN & TẢI VỀ -->
+      <div class="space-y-2.5 pt-2">
+        <button onclick="triggerPrint()" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition flex items-center justify-center text-sm">
+          <i class="fa-solid fa-print text-base mr-2"></i> In ngay (Print) / Lưu PDF sắc nét
+        </button>
+
+        <button id="btn-download-pdf" onclick="triggerDownloadPDF()" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-500/20 transition flex items-center justify-center text-sm">
+          <i class="fa-solid fa-file-pdf text-base mr-2"></i> Tải về toàn bộ file PDF gộp
+        </button>
+
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button onclick="triggerDownloadDocx()" class="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg text-xs transition flex items-center justify-center border border-slate-200">
+            <i class="fa-solid fa-file-word text-blue-600 mr-1.5"></i> Tải file Word (.docx)
+          </button>
+          <button onclick="openLivePreview()" class="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg text-xs transition flex items-center justify-center border border-slate-200">
+            <i class="fa-solid fa-eye text-indigo-600 mr-1.5"></i> Xem trước trực quan
+          </button>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100">
+        <button onclick="closeCompletionModal()" class="text-xs text-slate-400 hover:text-slate-600 font-medium">
+          Đóng cửa sổ này
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL XEM TRƯỚC HỢP ĐỒNG ================= -->
+  <div id="preview-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-100 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl modal-animate-in border border-slate-300">
+      <div class="p-4 bg-white border-b border-slate-200 rounded-t-2xl flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-file-invoice text-blue-600 text-lg"></i>
+          <h3 class="font-bold text-slate-900 text-base">Xem Trước Hợp Đồng Đã Điền</h3>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="triggerPrint()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">
+            <i class="fa-solid fa-print mr-1"></i> In
+          </button>
+          <button onclick="closeLivePreview()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold">
+            Đóng
+          </button>
+        </div>
+      </div>
+      <div id="preview-modal-content" class="p-6 overflow-y-auto flex-1 bg-slate-200">
+        <!-- Nội dung các hợp đồng được nạp vào đây -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= VÙNG RENDER TẤT CẢ HỢP ĐỒNG (DÙNG CHO IN VÀ XUẤT PDF) ================= -->
+  <div id="contracts-render-area" class="a4-container"></div>
+
+  <!-- SCRIPT KHỞI CHẠY ỨNG DỤNG -->
+  <script src="app.js"></script>
+</body>
+</html>

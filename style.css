@@ -1,0 +1,258 @@
+/* TÙY BIẾN GIAO DIỆN HIỆN ĐẠI & ĐỊNH DẠNG HỢP ĐỒNG A4 CHUẨN */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --primary-color: #2563eb;
+  --primary-hover: #1d4ed8;
+  --accent-color: #059669;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+
+/* Glassmorphism Cards */
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(148, 163, 184, 0.5);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animated Progress Bar */
+.progress-bar-striped {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.2) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.2) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+  animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+  0% { background-position: 1rem 0; }
+  100% { background-position: 0 0; }
+}
+
+/* Drag & Drop Zone */
+.dropzone-active {
+  border-color: #2563eb !important;
+  background-color: #eff6ff !important;
+  transform: scale(1.01);
+}
+
+/* A4 Sheet Simulation in Preview & Print */
+.a4-container {
+  font-family: 'Times New Roman', Times, serif;
+  color: #000;
+  font-size: 13pt;
+  line-height: 1.35;
+}
+
+.contract-paper {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 20mm 15mm 20mm 25mm; /* Chuẩn văn bản: Trên 20, Dưới 20, Trái 25, Phải 15 */
+  margin: 0 auto 30px auto;
+  background: #ffffff;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  page-break-after: always;
+  break-after: page;
+}
+
+.contract-paper:last-child {
+  page-break-after: avoid;
+  break-after: avoid;
+  margin-bottom: 0;
+}
+
+/* Tiêu chuẩn quốc hiệu & tiêu ngữ */
+.quoc-hieu {
+  font-size: 13pt;
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.tieu-ngu {
+  font-size: 13pt;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 2pt;
+}
+
+.tieu-ngu-line {
+  width: 140px;
+  height: 1px;
+  background-color: #000;
+  margin: 4pt auto 10pt auto;
+}
+
+.so-ky-hieu {
+  font-size: 12pt;
+  font-style: italic;
+  text-align: center;
+}
+
+.ngay-thang-nam {
+  font-size: 13pt;
+  font-style: italic;
+  text-align: right;
+  margin-top: 5pt;
+  margin-bottom: 12pt;
+}
+
+.ten-hop-dong {
+  font-size: 15pt;
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+  margin-top: 10pt;
+  margin-bottom: 4pt;
+}
+
+.dieu-khoan-title {
+  font-weight: bold;
+  margin-top: 8pt;
+  margin-bottom: 4pt;
+}
+
+.can-cu {
+  font-style: italic;
+  text-align: justify;
+  margin-bottom: 4pt;
+  text-indent: 25pt;
+}
+
+.table-chu-ky {
+  width: 100%;
+  margin-top: 20pt;
+  border-collapse: collapse;
+}
+
+.table-chu-ky td {
+  width: 50%;
+  text-align: center;
+  vertical-align: top;
+  border: none;
+  padding: 0 10pt;
+}
+
+.chu-ky-title {
+  font-weight: bold;
+  font-size: 13pt;
+  text-transform: uppercase;
+}
+
+.chu-ky-ghi-chu {
+  font-style: italic;
+  font-size: 12pt;
+  margin-top: 2pt;
+  margin-bottom: 50pt; /* Khoảng trống ký tên */
+}
+
+.chu-ky-ho-ten {
+  font-weight: bold;
+  font-size: 13pt;
+  text-transform: uppercase;
+}
+
+/* Căn lề đều 2 bên cho các đoạn nội dung */
+.paragraph-justify {
+  text-align: justify;
+  margin-bottom: 5pt;
+}
+
+/* Modal Popup animation */
+.modal-animate-in {
+  animation: modalScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalScaleUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* In ấn: Chỉ in vùng hợp đồng, loại bỏ toàn bộ giao diện phần mềm */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  #contracts-render-area {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .contract-paper {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 20mm 15mm 20mm 25mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .contract-paper:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 0; /* Margins are handled by .contract-paper padding */
+  }
+}
