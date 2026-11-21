@@ -1,4 +1,4 @@
-/* TÙY BIẾN GIAO DIỆN HIỆN ĐẠI & ĐỊNH DẠNG HỢP ĐỒNG A4 CHUẨN */
+/* TÙY BIẾN GIAO DIỆN HIỆN ĐẠI & ĐỊNH DẠNG HỢP ĐỒNG A4 CHUẨN v2.1 */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -28,43 +28,6 @@ body {
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Animated Progress Bar */
-.progress-bar-striped {
-  background-image: linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.2) 25%,
-    transparent 25%,
-    transparent 50%,
-    rgba(255, 255, 255, 0.2) 50%,
-    rgba(255, 255, 255, 0.2) 75%,
-    transparent 75%,
-    transparent
-  );
-  background-size: 1rem 1rem;
-  animation: progress-bar-stripes 1s linear infinite;
-}
-
-@keyframes progress-bar-stripes {
-  0% { background-position: 1rem 0; }
-  100% { background-position: 0 0; }
-}
-
 /* Drag & Drop Zone */
 .dropzone-active {
   border-color: #2563eb !important;
@@ -82,11 +45,10 @@ body {
 
 .contract-paper {
   width: 210mm;
-  min-height: 297mm;
-  padding: 20mm 15mm 20mm 25mm; /* Chuẩn văn bản: Trên 20, Dưới 20, Trái 25, Phải 15 */
+  padding: 20mm 15mm 20mm 20mm; /* Chuẩn văn bản: Trên 20, Dưới 20, Trái 20, Phải 15 */
   margin: 0 auto 30px auto;
   background: #ffffff;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
   page-break-after: always;
   break-after: page;
@@ -189,7 +151,6 @@ body {
   text-transform: uppercase;
 }
 
-/* Căn lề đều 2 bên cho các đoạn nội dung */
 .paragraph-justify {
   text-align: justify;
   margin-bottom: 5pt;
@@ -211,8 +172,19 @@ body {
   }
 }
 
-/* In ấn: Chỉ in vùng hợp đồng, loại bỏ toàn bộ giao diện phần mềm */
+/* =======================================================
+   ĐỊNH DẠNG IN ẤN CHUẨN XÁC:
+   - Ẩn toàn bộ giao diện web, modal, khung viền, nền xám
+   - Chỉ in vùng #print-area chứa văn bản hợp đồng thuần túy
+   - Phân trang chuẩn A4 từng người, không dính liền
+======================================================= */
 @media print {
+  /* ẨN TOÀN BỘ CÁC THÀNH PHẦN GIAO DIỆN & MODAL */
+  header, main, footer, #completion-modal, #preview-modal, .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   html, body {
     background: #ffffff !important;
     padding: 0 !important;
@@ -220,26 +192,25 @@ body {
     width: 100% !important;
   }
 
-  .no-print {
-    display: none !important;
+  /* HIỂN THỊ VÙNG IN */
+  #print-area {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  #contracts-render-area {
-    display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
+  #print-area * {
+    visibility: visible !important;
   }
 
   .contract-paper {
     width: 100% !important;
     max-width: 100% !important;
-    min-height: auto !important;
     margin: 0 !important;
-    padding: 20mm 15mm 20mm 25mm !important;
+    padding: 15mm 15mm 15mm 20mm !important;
     box-shadow: none !important;
     border: none !important;
     page-break-after: always !important;
@@ -253,6 +224,6 @@ body {
 
   @page {
     size: A4 portrait;
-    margin: 0; /* Margins are handled by .contract-paper padding */
+    margin: 0;
   }
 }

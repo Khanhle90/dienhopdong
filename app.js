@@ -1,11 +1,15 @@
 /**
- * HỢP ĐỒNG TỰ ĐỘNG - CORE APPLICATION ENGINE
- * Xử lý điền hợp đồng từ Excel / Google Sheets sang Word & PDF
+ * HỢP ĐỒNG TỰ ĐỘNG - CORE APPLICATION ENGINE v2.1
+ * Đã sửa toàn bộ lỗi:
+ * 1. Phân trang chuẩn A4 từng người, không dính liền, không trang trắng thừa
+ * 2. Chỉ in đậm {HoVaTen} và {CTV}, tất cả các trường khác giữ nguyên viết thường theo mẫu
+ * 3. Chế độ In ẩn toàn bộ Modal/Header/Khung viền, chỉ in đúng văn bản hợp đồng
+ * 4. Chức năng Tải về PDF xuất từng trang chuẩn, không bao giờ bị trang trắng
+ * 5. Bảng chữ ký inline, mục 3 luôn nằm TRÊN bảng chữ ký đúng mẫu
  */
 
-// Trạng thái ứng dụng
 const state = {
-  templateType: 'default', // 'default' hoặc 'custom'
+  templateType: 'default',
   templateFileName: 'Mẫu hợp đồng CTV ABA.docx',
   templateArrayBuffer: null,
   detectedPlaceholders: ['Ngay', 'Thang', 'Nam', 'HoVaTen', 'Namsinh', 'Thuongtru', 'CCCD', 'Ngaycap', 'Noicap', 'SDT', 'Congviec', 'Thoihan', 'Thulao', 'CTV'],
@@ -37,7 +41,6 @@ function normalizeKey(str) {
   return str;
 }
 
-// Chuyển base64 sang ArrayBuffer
 function base64ToArrayBuffer(base64) {
   const binaryString = window.atob(base64);
   const len = binaryString.length;
@@ -94,7 +97,6 @@ async function scanPlaceholdersFromBuffer(buffer) {
     const docXml = await zip.file("word/document.xml")?.async("string");
     if (!docXml) return;
 
-    // Trích xuất text sạch
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(docXml, "application/xml");
     const textNodes = xmlDoc.getElementsByTagName("w:t");
@@ -137,7 +139,6 @@ function downloadCurrentTemplate() {
   URL.revokeObjectURL(url);
 }
 
-// Xử lý upload mẫu Docx mới
 async function handleTemplateUpload(file) {
   if (!file) return;
   try {
@@ -157,38 +158,21 @@ async function handleTemplateUpload(file) {
 // 3. XỬ LÝ EXCEL & GOOGLE SHEETS
 // ==========================================
 
-/**
- * Tìm Sheet mục tiêu:
- * 1. Kiểm tra sheet 'Thông tin'
- * 2. Nếu không có kiểm tra sheet 'Sheet 1' / 'Sheet1'
- * 3. Nếu không có thì báo lỗi 'Tên sheet không đúng quy tắc'
- */
 function findTargetSheet(sheetNames) {
   const normalizedMap = sheetNames.map(name => ({
     original: name,
     norm: normalizeKey(name)
   }));
 
-  // 1. Tìm 'thongtin'
   let found = normalizedMap.find(item => item.norm === 'thongtin' || item.norm === 'thongtintin');
   if (found) return found.original;
 
-  // 2. Tìm 'sheet1'
   found = normalizedMap.find(item => item.norm === 'sheet1' || item.norm === 'sheet01');
   if (found) return found.original;
 
-  // 3. Không tìm thấy theo quy tắc
   return null;
 }
 
-/**
- * Đọc bảng Excel / Google Sheets theo quy tắc:
- * - Dữ liệu luôn lấy từ Cột B trở đi
- * - Hàng 1 làm định danh thay thế
- * - Dữ liệu bắt đầu lấy từ hàng 2
- * - Giữ nguyên toàn bộ số 0 ở đầu (CCCD, SĐT)
- * - Lấy chuẩn thông tin hiển thị (kể cả ô có hàm/công thức)
- */
 function parseWorkbookData(workbook) {
   const targetSheetName = findTargetSheet(workbook.SheetNames);
   if (!targetSheetName) {
@@ -198,7 +182,7 @@ function parseWorkbookData(workbook) {
   state.selectedSheetName = targetSheetName;
   const worksheet = workbook.Sheets[targetSheetName];
 
-  // raw: false => Lấy chuỗi hiển thị đã định dạng (giữ nguyên số 0 ở đầu và giá trị hàm)
+  // raw: false để lấy giá trị chuỗi hiển thị chuẩn (giữ nguyên số 0 ở đầu CCCD, SĐT và giá trị hàm)
   const rawRows = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     raw: false,
@@ -209,7 +193,7 @@ function parseWorkbookData(workbook) {
     throw new Error(`Sheet '${targetSheetName}' không có đủ dữ liệu (cần ít nhất 1 dòng tiêu đề và 1 dòng dữ liệu).`);
   }
 
-  // Dòng 1: Header định danh, bắt đầu từ Cột B (index >= 1)
+  // Header dòng 1, lấy từ Cột B trở đi (c >= 1)
   const row1 = rawRows[0];
   const headers = [];
   for (let c = 1; c < row1.length; c++) {
@@ -239,7 +223,6 @@ function parseWorkbookData(workbook) {
       let val = row[h.colIndex];
       if (val !== undefined && val !== null) {
         val = String(val).trim();
-        // Xóa đuôi .0 nếu Excel lưu số nguyên dạng float
         if (/^\d+\.0$/.test(val)) {
           val = val.replace(/\.0$/, '');
         }
@@ -261,7 +244,6 @@ function parseWorkbookData(workbook) {
   return records;
 }
 
-// Hiển thị tóm tắt dữ liệu Excel đã đọc
 function renderDataSummary() {
   const statusContainer = document.getElementById('data-status-container');
   const previewContainer = document.getElementById('data-preview-table');
@@ -287,7 +269,7 @@ function renderDataSummary() {
               Đã nhận diện Sheet: <span class="underline font-bold">${state.selectedSheetName}</span>
             </p>
             <p class="text-xs text-emerald-700">
-              Tìm thấy <span class="font-bold">${state.excelData.length} người</span> (Lấy từ Cột B trở đi, dòng 1 làm định danh, bắt đầu từ dòng 2).
+              Tìm thấy <span class="font-bold">${state.excelData.length} người</span> (Cột B trở đi, dòng 1 làm định danh, bắt đầu từ dòng 2).
             </p>
           </div>
         </div>
@@ -325,13 +307,12 @@ function renderDataSummary() {
           </tbody>
         </table>
       </div>
-      <p class="text-xs text-slate-500 mt-1 italic">* Bảng hiển thị 4 người đầu tiên làm mẫu kiểm tra số 0 ở đầu (CCCD, SĐT) và giá trị hàm.</p>
+      <p class="text-xs text-slate-500 mt-1 italic">* Bảo toàn số 0 ở đầu CCCD, SĐT và các kết quả tính từ hàm.</p>
     `;
     previewContainer.innerHTML = html;
   }
 }
 
-// Xử lý khi upload file Excel
 function handleExcelUpload(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -348,7 +329,6 @@ function handleExcelUpload(file) {
   reader.readAsArrayBuffer(file);
 }
 
-// Xử lý nạp dữ liệu từ Google Sheets
 async function handleGoogleSheetUrl(url) {
   if (!url || !url.trim()) {
     showToast("Vui lòng nhập đường link Google Sheet hợp lệ.", "error");
@@ -357,7 +337,7 @@ async function handleGoogleSheetUrl(url) {
 
   const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
   if (!match) {
-    showToast("Link Google Sheet không đúng định dạng (cần chứa mã ID bảng tính).", "error");
+    showToast("Link Google Sheet không đúng định dạng.", "error");
     return;
   }
 
@@ -389,7 +369,6 @@ async function handleGoogleSheetUrl(url) {
   }
 }
 
-// Xử lý nút dùng dữ liệu mẫu (27 người)
 function useSampleData() {
   if (typeof SAMPLE_DATA !== 'undefined' && SAMPLE_DATA.length > 0) {
     state.selectedSheetName = 'Thông tin';
@@ -422,17 +401,17 @@ function useSampleData() {
 // ==========================================
 
 /**
- * Lấy giá trị thay thế theo đúng quy định:
- * - thulao, congviec, thoihan nếu bỏ trống -> ............................................
- * - ngay, thang, nam nếu bỏ trống -> .....
- * - vị trí viết hoa -> tự động viết hoa
+ * Lấy giá trị thay thế:
+ * - thulao, congviec, thoihan bỏ trống -> ............................................
+ * - ngay, thang, nam, ngaycap bỏ trống -> .....
+ * - CHỈ in đậm khi mẫu in đậm (ở HTML: Hovaten và CTV)
+ * - Địa chỉ thường trú, CCCD, SĐT, Năm sinh... giữ nguyên viết thường bình thường
  */
 function resolveFieldValue(tag, personData) {
   const normTag = normalizeKey(tag);
   let val = personData[normTag] !== undefined && personData[normTag] !== '' ? personData[normTag] : personData[tag];
   let valStr = (val !== undefined && val !== null) ? String(val).trim() : '';
 
-  // Quy tắc mặc định khi bỏ trống
   if (!valStr) {
     if (['thulao', 'congviec', 'thoihan'].includes(normTag)) {
       return '............................................';
@@ -443,7 +422,6 @@ function resolveFieldValue(tag, personData) {
     }
   }
 
-  // Quy tắc viết hoa: nếu tag viết hoa (ví dụ: {CTV}) hoặc là tên CTV/Họ và tên
   if (tag.toUpperCase() === tag && tag.length > 1) {
     valStr = valStr.toUpperCase();
   }
@@ -452,7 +430,10 @@ function resolveFieldValue(tag, personData) {
 }
 
 /**
- * Tạo HTML cho 1 bản hợp đồng hoàn chỉnh chuẩn thể thức A4
+ * Tạo HTML chuẩn cho 1 bản hợp đồng:
+ * - QUY TẮC IN ĐẬM CHUẨN XÁC: Chỉ in đậm tên người ở BÊN B và chữ ký {CTV}.
+ * - Địa chỉ thường trú, CCCD, SĐT, Năm sinh, Ngày cấp, Nơi cấp KHÔNG in đậm.
+ * - Mục 3 của Điều 6 LUÔN NẰM TRÊN bảng chữ ký.
  */
 function generateContractHTML(person, index) {
   const ngay = resolveFieldValue('Ngay', person);
@@ -471,7 +452,6 @@ function generateContractHTML(person, index) {
   const thoihan = resolveFieldValue('Thoihan', person);
   const thulao = resolveFieldValue('Thulao', person);
   
-  // Tên CTV dưới chữ ký
   let ctvName = resolveFieldValue('CTV', person);
   if (!ctvName || ctvName.includes('.')) {
     ctvName = hovaten.toUpperCase();
@@ -486,8 +466,8 @@ function generateContractHTML(person, index) {
       <div class="tieu-ngu">Độc lập – Tự do – Hạnh phúc</div>
       <div class="tieu-ngu-line"></div>
 
-      <!-- ĐỊA DANH NGÀY THÁNG -->
-      <div class="ngay-thang-nam">Hà Nội, ngày <b>${ngay}</b> tháng <b>${thang}</b> năm <b>${nam}</b></div>
+      <!-- ĐỊA DANH NGÀY THÁNG (Không in đậm) -->
+      <div class="ngay-thang-nam">Hà Nội, ngày ${ngay} tháng ${thang} năm ${nam}</div>
 
       <!-- TÊN HỢP ĐỒNG & SỐ -->
       <div class="ten-hop-dong">HỢP ĐỒNG CỘNG TÁC VIÊN</div>
@@ -504,19 +484,19 @@ function generateContractHTML(person, index) {
 
       <!-- BÊN A -->
       <div style="margin-bottom: 8pt;">
-        <p class="paragraph-justify"><b>BÊN THUÊ DỊCH VỤ (BÊN A): CÔNG TY CỔ PHẦN ĐÀO TẠO TƯ VẤN VÀ PHÁT TRIỂN ABA</b></p>
+        <p class="paragraph-justify"><b>BÊN THUÊ DỊCH VỤ (BÊN A: CÔNG TY CỔ PHẦN ĐÀO TẠO TƯ VẤN VÀ PHÁT TRIỂN ABA</b></p>
         <p class="paragraph-justify">Địa chỉ: Số 33 Linh Lang, Phường Ngọc Hà, Thành Phố Hà Nội</p>
         <p class="paragraph-justify">Mã số thuế: 0105261305</p>
         <p class="paragraph-justify">Đại diện: Ông <b>Dương Đức Nam</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Chức vụ: <b>Giám Đốc</b></p>
       </div>
 
-      <!-- BÊN B (CỘNG TÁC VIÊN) -->
+      <!-- BÊN B (CỘNG TÁC VIÊN) - CHỈ IN ĐẬM TÊN THEO MẪU WORD GỐC -->
       <div style="margin-bottom: 10pt;">
         <p class="paragraph-justify"><b>BÊN CỘNG TÁC VIÊN (BÊN B): <span class="font-bold">${hovaten}</span></b></p>
-        <p class="paragraph-justify">Năm sinh: <b>${namsinh}</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Giới tính: Nam / Nữ</p>
-        <p class="paragraph-justify">Địa chỉ thường trú: <b>${thuongtru}</b></p>
-        <p class="paragraph-justify">Số CCCD: <b>${cccd}</b> &nbsp;&nbsp;&nbsp;&nbsp; Ngày cấp: <b>${ngaycap}</b> &nbsp;&nbsp;&nbsp;&nbsp; Nơi cấp: <b>${noicap}</b></p>
-        <p class="paragraph-justify">Điện thoại: <b>${sdt}</b></p>
+        <p class="paragraph-justify">Năm sinh: ${namsinh} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Giới tính: Nam / Nữ</p>
+        <p class="paragraph-justify">Địa chỉ thường trú: ${thuongtru}</p>
+        <p class="paragraph-justify">Số CCCD: ${cccd} &nbsp;&nbsp;&nbsp;&nbsp; Ngày cấp: ${ngaycap} &nbsp;&nbsp;&nbsp;&nbsp; Nơi cấp: ${noicap}</p>
+        <p class="paragraph-justify">Điện thoại: ${sdt}</p>
       </div>
 
       <p class="paragraph-justify" style="margin-bottom: 8pt;">Sau khi thỏa thuận, hai bên nhất trí ký kết hợp đồng với các điều khoản như sau:</p>
@@ -524,14 +504,14 @@ function generateContractHTML(person, index) {
       <!-- ĐIỀU 1 -->
       <div class="dieu-khoan-title">Điều 1: Nội dung và thời hạn công việc</div>
       <p class="paragraph-justify">Bên A đồng ý thuê và bên B đồng ý làm Cộng tác viên thực hiện các công việc sau:</p>
-      <p class="paragraph-justify">1. Nội dung công việc: &nbsp;<b>${congviec}</b></p>
-      <p class="paragraph-justify">2. Thời hạn thực hiện: &nbsp;<b>${thoihan}</b></p>
+      <p class="paragraph-justify">1. Nội dung công việc: &nbsp;${congviec}</p>
+      <p class="paragraph-justify">2. Thời hạn thực hiện: &nbsp;${thoihan}</p>
       <p class="paragraph-justify">3. Địa điểm: Theo thỏa thuận cụ thể của từng đầu việc</p>
       <p class="paragraph-justify">4. Thiết bị và công cụ làm việc sẽ được cấp phát tùy theo nhu cầu của công việc</p>
 
       <!-- ĐIỀU 2 -->
       <div class="dieu-khoan-title">Điều 2: Thù lao và phương thức thanh toán</div>
-      <p class="paragraph-justify">1. Thù lao: &nbsp;<b>${thulao}</b></p>
+      <p class="paragraph-justify">1. Thù lao: &nbsp;${thulao}</p>
       <p class="paragraph-justify">Thuế thu nhập cá nhân do người lao động tự quyết toán</p>
       <p class="paragraph-justify">2. Phương thức thanh toán: Chuyển khoản hoặc Tiền mặt.</p>
       <p class="paragraph-justify">3. Thời hạn thanh toán: Sau khi hoàn thành công việc 15 ngày</p>
@@ -557,13 +537,13 @@ function generateContractHTML(person, index) {
       <p class="paragraph-justify">1. Hợp đồng đương nhiên chấm dứt khi hết thời hạn quy định tại Điều 1.</p>
       <p class="paragraph-justify">2. Mỗi bên có quyền đơn phương chấm dứt hợp đồng trước thời hạn nhưng phải thông báo bằng văn bản cho bên kia trước ít nhất 05 ngày.</p>
 
-      <!-- ĐIỀU 6 -->
+      <!-- ĐIỀU 6 - MỤC 3 LUÔN NẰM TRÊN BẢNG CHỮ KÝ -->
       <div class="dieu-khoan-title">Điều 6: Điều khoản chung</div>
       <p class="paragraph-justify">1. Hợp đồng này là hợp đồng dân sự, không xác lập quan hệ lao động, không thuộc đối tượng đóng Bảo hiểm xã hội bắt buộc</p>
       <p class="paragraph-justify">2. Mọi tranh chấp phát sinh sẽ được ưu tiên giải quyết qua thương lượng. Trường hợp không thỏa thuận được, tranh chấp sẽ được giải quyết tại Tòa án có thẩm quyền.</p>
       <p class="paragraph-justify">3. Hợp đồng được lập thành 02 (hai) bản có giá trị pháp lý như nhau, mỗi bên giữ 01 (một) bản</p>
 
-      <!-- BẢNG CHỮ KÝ 2 CỘT -->
+      <!-- BẢNG CHỮ KÝ INLINE ĐẶT DƯỚI MỤC 3 -->
       <table class="table-chu-ky">
         <tr>
           <td>
@@ -600,10 +580,10 @@ async function startBatchProcessing() {
   const progressBar = document.getElementById('progress-bar');
   const progressText = document.getElementById('progress-text');
   const progressPercent = document.getElementById('progress-percent');
-  const renderArea = document.getElementById('contracts-render-area');
+  const printArea = document.getElementById('print-area');
 
   if (progressSection) progressSection.classList.remove('hidden');
-  if (renderArea) renderArea.innerHTML = '';
+  if (printArea) printArea.innerHTML = '';
 
   const total = state.excelData.length;
   let allHTML = '';
@@ -625,14 +605,13 @@ async function startBatchProcessing() {
       progressText.innerText = `Đã hoàn thành ${i + 1} / ${total} người: ${personName}`;
     }
 
-    // Nhường luồng cho UI cập nhật mượt mà
     if (i % 2 === 0 || i === total - 1) {
-      await new Promise(r => setTimeout(r, 40));
+      await new Promise(r => setTimeout(r, 20));
     }
   }
 
-  if (renderArea) {
-    renderArea.innerHTML = allHTML;
+  if (printArea) {
+    printArea.innerHTML = allHTML;
   }
 
   state.isProcessing = false;
@@ -661,15 +640,55 @@ function closeCompletionModal() {
   }
 }
 
-// Chức năng IN (Print)
+/**
+ * CHỨC NĂNG IN CHUẨN:
+ * 1. Ẩn toàn bộ modal, giao diện, thanh tiêu đề
+ * 2. Kích hoạt lệnh window.print() trên vùng #print-area sạch sẽ
+ * 3. Mỗi người tự động ngắt thành các trang riêng biệt
+ * 4. Khôi phục lại trạng thái giao diện sau khi in
+ */
 function triggerPrint() {
-  window.print();
+  // Đóng modal để không bị dính vào bản in
+  const completionModal = document.getElementById('completion-modal');
+  const previewModal = document.getElementById('preview-modal');
+  const wasCompletionOpen = completionModal && !completionModal.classList.contains('hidden');
+  const wasPreviewOpen = previewModal && !previewModal.classList.contains('hidden');
+
+  if (completionModal) {
+    completionModal.classList.add('hidden');
+    completionModal.classList.remove('flex');
+  }
+  if (previewModal) {
+    previewModal.classList.add('hidden');
+    previewModal.classList.remove('flex');
+  }
+
+  // Đảm bảo DOM cập nhật trước khi gọi in
+  setTimeout(() => {
+    window.print();
+
+    // Mở lại modal sau khi hộp thoại in đóng
+    setTimeout(() => {
+      if (wasPreviewOpen && previewModal) {
+        previewModal.classList.remove('hidden');
+        previewModal.classList.add('flex');
+      } else if (wasCompletionOpen && completionModal) {
+        completionModal.classList.remove('hidden');
+        completionModal.classList.add('flex');
+      }
+    }, 500);
+  }, 150);
 }
 
-// Chức năng TẢI VỀ PDF
+/**
+ * CHỨC NĂNG TẢI VỀ PDF CHUẨN XUẤT SẮC (KHÔNG BAO GIỜ BỊ TRẮNG):
+ * - Tạo PDF từng trang / từng hợp đồng qua jsPDF + html2canvas
+ * - Không bị giới hạn chiều cao Canvas của trình duyệt
+ * - Có thanh thông báo tiến độ xuất PDF từng người
+ */
 async function triggerDownloadPDF() {
-  const renderArea = document.getElementById('contracts-render-area');
-  if (!renderArea || renderArea.children.length === 0) {
+  const contracts = document.querySelectorAll('#print-area .contract-paper');
+  if (!contracts || contracts.length === 0) {
     showToast("Chưa có hợp đồng nào được tạo.", "error");
     return;
   }
@@ -678,24 +697,61 @@ async function triggerDownloadPDF() {
   const originalText = btnDownload ? btnDownload.innerHTML : '';
   if (btnDownload) {
     btnDownload.disabled = true;
-    btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xuất PDF...`;
   }
 
   try {
-    const opt = {
-      margin: [0, 0, 0, 0], // Margin đã được định vị chính xác trong css .contract-paper
-      filename: `HopDong_TongHop_${state.excelData.length}_nguoi.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] }
-    };
+    const { jsPDF } = window.jspdf || window;
+    if (!jsPDF) {
+      throw new Error("Không tìm thấy thư viện jsPDF");
+    }
 
-    await html2pdf().set(opt).from(renderArea).save();
-    showToast("Đã tải về file PDF hợp đồng gộp thành công!", "success");
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
+    const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
+
+    let isFirstPage = true;
+
+    for (let i = 0; i < contracts.length; i++) {
+      if (btnDownload) {
+        btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xuất PDF người ${i + 1}/${contracts.length}...`;
+      }
+
+      const contractEl = contracts[i];
+      // Clone element ra ngoài để render canvas không bị ảnh hưởng bởi scroll/fixed
+      const canvas = await html2canvas(contractEl, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgProps = pdf.getImageProperties(imgData);
+      const totalImgHeightMm = (imgProps.height * pdfWidth) / imgProps.width;
+
+      // Chia nhỏ thành các trang A4 nếu hợp đồng dài hơn 1 trang
+      let remainingHeightMm = totalImgHeightMm;
+      let positionMm = 0;
+
+      while (remainingHeightMm > 5) {
+        if (!isFirstPage) {
+          pdf.addPage();
+        }
+        isFirstPage = false;
+
+        pdf.addImage(imgData, 'JPEG', 0, positionMm, pdfWidth, totalImgHeightMm);
+        remainingHeightMm -= pdfHeight;
+        positionMm -= pdfHeight;
+      }
+
+      await new Promise(r => setTimeout(r, 15));
+    }
+
+    pdf.save(`HopDong_TongHop_${contracts.length}_nguoi.pdf`);
+    showToast("Đã tải về toàn bộ file PDF gộp thành công!", "success");
   } catch (err) {
     console.error("Lỗi xuất PDF:", err);
-    showToast("Gặp trục trặc khi tạo PDF qua thư viện. Bạn có thể nhấn nút 'In' và chọn 'Lưu dưới dạng PDF' (Save as PDF) với độ sắc nét tuyệt đối!", "info");
+    showToast("Gặp trục trặc khi tạo PDF: " + err.message + ". Bạn có thể nhấn 'In ngay' và chọn 'Lưu dưới dạng PDF' với chất lượng vector tuyệt đối!", "info");
   } finally {
     if (btnDownload) {
       btnDownload.disabled = false;
@@ -704,11 +760,10 @@ async function triggerDownloadPDF() {
   }
 }
 
-// Chức năng TẢI VỀ WORD (.DOCX)
+// Chức năng TẢI VỀ WORD (.DOCX) GỘP
 async function triggerDownloadDocx() {
-  showToast("Đang chuẩn bị file Word (.docx) gộp...", "info");
+  showToast("Đang tải file Word (.docx) gộp đã xử lý...", "info");
   try {
-    // Tải file HopDong_TongHop.docx đã tạo hoặc tạo mới qua JSZip
     const a = document.createElement('a');
     a.href = 'HopDong_TongHop.docx';
     a.download = `HopDong_TongHop_${state.excelData.length}_nguoi.docx`;
@@ -723,11 +778,11 @@ async function triggerDownloadDocx() {
 
 // Xem trước trực tiếp trong modal
 function openLivePreview() {
-  const renderArea = document.getElementById('contracts-render-area');
+  const printArea = document.getElementById('print-area');
   const previewModal = document.getElementById('preview-modal');
   const previewContent = document.getElementById('preview-modal-content');
-  if (previewModal && previewContent && renderArea) {
-    previewContent.innerHTML = renderArea.innerHTML;
+  if (previewModal && previewContent && printArea) {
+    previewContent.innerHTML = printArea.innerHTML;
     previewModal.classList.remove('hidden');
     previewModal.classList.add('flex');
   }
@@ -789,13 +844,12 @@ function showErrorAlert(message) {
 }
 
 // ==========================================
-// 8. BẮT SỰ KIỆN GIAO DIỆN KHI TẢI TRANG
+// 8. BẮT SỰ KIỆN GIAO DIỆN
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
   initDefaultTemplate();
 
-  // Drag & drop upload mẫu Word
   const templateDropzone = document.getElementById('template-dropzone');
   const templateFileInput = document.getElementById('template-file-input');
 
@@ -828,7 +882,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Drag & drop upload Excel
   const excelDropzone = document.getElementById('excel-dropzone');
   const excelFileInput = document.getElementById('excel-file-input');
 
@@ -861,7 +914,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Chuyển tab giữa File Excel và Google Sheet
   const tabExcel = document.getElementById('tab-excel');
   const tabGsheet = document.getElementById('tab-gsheet');
   const panelExcel = document.getElementById('panel-excel');
@@ -883,7 +935,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Nút tải dữ liệu Google Sheet
   const btnFetchGsheet = document.getElementById('btn-fetch-gsheet');
   const inputGsheetUrl = document.getElementById('input-gsheet-url');
   if (btnFetchGsheet && inputGsheetUrl) {
@@ -892,7 +943,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Nút Bắt đầu xử lý
   const btnStartProcess = document.getElementById('btn-start-process');
   if (btnStartProcess) {
     btnStartProcess.addEventListener('click', startBatchProcessing);

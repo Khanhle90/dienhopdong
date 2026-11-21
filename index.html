@@ -254,7 +254,7 @@
   </footer>
 
   <!-- ================= MODAL THÔNG BÁO HOÀN THÀNH ================= -->
-  <div id="completion-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div id="completion-modal" class="no-print hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl modal-animate-in border border-slate-100 text-center space-y-5">
       <div class="w-16 h-16 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl shadow-inner">
         <i class="fa-solid fa-circle-check"></i>
@@ -295,18 +295,18 @@
   </div>
 
   <!-- ================= MODAL XEM TRƯỚC HỢP ĐỒNG ================= -->
-  <div id="preview-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4">
+  <div id="preview-modal" class="no-print hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-100 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl modal-animate-in border border-slate-300">
-      <div class="p-4 bg-white border-b border-slate-200 rounded-t-2xl flex items-center justify-between">
+      <div class="p-4 bg-white border-b border-slate-200 rounded-t-2xl flex items-center justify-between no-print">
         <div class="flex items-center space-x-2">
           <i class="fa-solid fa-file-invoice text-blue-600 text-lg"></i>
           <h3 class="font-bold text-slate-900 text-base">Xem Trước Hợp Đồng Đã Điền</h3>
         </div>
         <div class="flex items-center space-x-2">
-          <button onclick="triggerPrint()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">
-            <i class="fa-solid fa-print mr-1"></i> In
+          <button onclick="triggerPrint()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+            <i class="fa-solid fa-print mr-1"></i> In ngay
           </button>
-          <button onclick="closeLivePreview()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold">
+          <button onclick="closeLivePreview()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition">
             Đóng
           </button>
         </div>
@@ -318,7 +318,7 @@
   </div>
 
   <!-- ================= VÙNG RENDER TẤT CẢ HỢP ĐỒNG (DÙNG CHO IN VÀ XUẤT PDF) ================= -->
-  <div id="contracts-render-area" class="a4-container"></div>
+  <div id="print-area" class="a4-container"></div>
 
   <!-- SCRIPT KHỞI CHẠY ỨNG DỤNG -->
   <script src="app.js"></script>

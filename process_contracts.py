@@ -1,7 +1,7 @@
 """
 CHƯƠNG TRÌNH TỰ ĐỘNG ĐIỀN HỢP ĐỒNG TỪ EXCEL SANG WORD & PDF
 Tác giả: Hợp đồng tự động ABA
-Phiên bản: 2.0
+Phiên bản: 2.1 (Đã sửa lỗi phân trang, lỗi bảng trôi và định dạng in đậm)
 """
 
 import os
@@ -11,7 +11,7 @@ import openpyxl
 import docx
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
+from docx.oxml import parse_xml
 from docx.oxml.ns import qn
 
 def normalize_key(s):
@@ -102,12 +102,6 @@ def read_excel(excel_path):
     return records
 
 def get_field_value(tag, data):
-    """
-    Lấy giá trị thay thế theo quy tắc:
-    - thulao, congviec, thoihan để trống -> ............................................
-    - ngay, thang, nam để trống -> .....
-    - các trường khác để trống -> ..... hoặc rỗng
-    """
     norm_tag = normalize_key(tag)
     val = data.get(norm_tag)
     if val is None or val == '':
@@ -127,7 +121,9 @@ def get_field_value(tag, data):
 def replace_in_paragraph(paragraph, data):
     """
     Thay thế các placeholder {tag} trong đoạn văn bản.
-    Bảo toàn định dạng in đậm, in nghiêng, gạch chân và font chữ.
+    QUY TẮC BẢO TOÀN IN ĐẬM:
+    - CHỈ in đậm khi chính từ placeholder đó được in đậm trong mẫu (ví dụ: {HoVaTen} trong BÊN B).
+    - Các từ khác (như {Thuongtru}, {CCCD}, {SDT}, {Congviec}...) nếu mẫu viết thường thì giữ NGUYÊN viết thường (không tự ý bôi đen).
     """
     full_text = "".join(r.text for r in paragraph.runs)
     if '{' not in full_text:
@@ -165,24 +161,27 @@ def replace_in_paragraph(paragraph, data):
         # Lấy giá trị thay thế
         val = get_field_value(tag, data)
         
-        # Kiểm tra xem placeholder có được bôi đen không
-        placeholder_run_indices = set(char_runs[start:end])
-        is_bold = any(paragraph.runs[ri].bold for ri in placeholder_run_indices)
-        is_italic = any(paragraph.runs[ri].italic for ri in placeholder_run_indices)
+        # Kiểm tra xem chính phần text của tag (không tính dấu {}) có được in đậm không
+        tag_start_char = start + 1
+        tag_r_idx = char_runs[tag_start_char] if tag_start_char < len(char_runs) else char_runs[start]
+        tag_run = paragraph.runs[tag_r_idx]
         
-        # Quy tắc: nếu vị trí thay thế viết hoa thì tự động viết hoa
-        if tag.isupper() or (len(tag) > 1 and normalize_key(tag) in ['ctv', 'hovaten'] and is_bold):
+        # In đậm CHỈ KHI run chứa tag có bold=True (ví dụ {HoVaTen} trong Bên B)
+        is_bold = bool(tag_run.bold)
+        is_italic = bool(tag_run.italic)
+        
+        # Quy tắc: nếu vị trí thay thế viết hoa thì tự động viết hoa (như {CTV})
+        if tag.isupper() or normalize_key(tag) == 'ctv':
             val = val.upper()
             
-        first_r = paragraph.runs[char_runs[start]]
-        font_name = first_r.font.name if first_r.font else None
-        font_size = first_r.font.size if first_r.font else None
+        font_name = tag_run.font.name if tag_run.font else None
+        font_size = tag_run.font.size if tag_run.font else None
         
         new_runs_data.append({
             'chunk': val,
-            'bold': is_bold or first_r.bold,
+            'bold': is_bold,
             'italic': is_italic,
-            'underline': first_r.underline,
+            'underline': tag_run.underline,
             'font_name': font_name,
             'font_size': font_size
         })
@@ -229,12 +228,11 @@ def replace_in_paragraph(paragraph, data):
     if curr_run:
         merged_runs.append(curr_run)
         
-    # Xóa các runs cũ
+    # Xóa các runs cũ và thêm runs mới
     p_elem = paragraph._p
     for r_elem in p_elem.findall(qn('w:r')):
         p_elem.remove(r_elem)
         
-    # Thêm runs mới
     for mr in merged_runs:
         r = paragraph.add_run(mr['text'])
         if mr['bold']:
@@ -247,6 +245,17 @@ def replace_in_paragraph(paragraph, data):
             r.font.name = mr['font_name']
         if mr['font_size']:
             r.font.size = mr['font_size']
+
+def fix_table_floating(table):
+    """
+    Xóa thuộc tính tblpPr (bảng trôi) để bảng chữ ký thành bảng thẳng hàng (inline).
+    Điều này đảm bảo mục 3 ("Hợp đồng được lập thành 02 bản...") LUÔN NẰM TRÊN bảng chữ ký,
+    không bị Word đẩy nhảy xuống dưới.
+    """
+    tblPr = table._tbl.tblPr
+    tblpPr = tblPr.find(qn('w:tblpPr'))
+    if tblpPr is not None:
+        tblPr.remove(tblpPr)
 
 def strip_trailing_empty_paragraphs(doc):
     """
@@ -262,24 +271,29 @@ def process_single_contract(template_path, data):
     """
     doc = docx.Document(template_path)
     
-    # Thay thế trong paragraphs
+    # 1. Thay thế trong paragraphs
     for p in doc.paragraphs:
         replace_in_paragraph(p, data)
         
-    # Thay thế trong tables
+    # 2. Thay thế trong tables và loại bỏ floating table
     for table in doc.tables:
+        fix_table_floating(table)
         for row in table.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
                     replace_in_paragraph(p, data)
                     
-    # Loại bỏ trang trắng thừa cuối văn bản
+    # 3. Loại bỏ trang trắng thừa cuối văn bản
     strip_trailing_empty_paragraphs(doc)
     return doc
 
 def merge_documents(template_path, records, output_merged_path):
     """
-    Tạo file Word tổng hợp chứa tất cả hợp đồng của mọi người, nối liền bằng dấu ngắt trang.
+    Tạo file Word tổng hợp chứa tất cả hợp đồng của mọi người.
+    ĐẢM BẢO:
+    - Tất cả phần tử được chèn TRƯỚC sectPr để không làm hỏng cấu trúc file OpenXML
+    - Mỗi người được phân tách bởi ngắt trang rõ ràng (pageBreak)
+    - Không phát sinh trang trắng thừa
     """
     print(f"\n[+] Bắt đầu tạo file hợp đồng tổng hợp cho {len(records)} người...")
     master_doc = None
@@ -291,13 +305,24 @@ def merge_documents(template_path, records, output_merged_path):
         if master_doc is None:
             master_doc = doc_i
         else:
-            # Thêm page break
-            master_doc.add_page_break()
-            # Nối các phần tử của doc_i vào master_doc
+            sectPr = master_doc._body._body.find(qn('w:sectPr'))
+            
+            # Thêm ngắt trang chuẩn trước sectPr
+            p_br = parse_xml(r'<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:br w:type="page"/></w:r></w:p>')
+            if sectPr is not None:
+                sectPr.addprevious(p_br)
+            else:
+                master_doc._body._body.append(p_br)
+                
+            # Thêm các phần tử của doc_i trước sectPr
             for element in doc_i._body._body:
                 if element.tag.endswith('sectPr'):
                     continue
-                master_doc._body._body.append(copy.deepcopy(element))
+                new_el = copy.deepcopy(element)
+                if sectPr is not None:
+                    sectPr.addprevious(new_el)
+                else:
+                    master_doc._body._body.append(new_el)
                 
         progress = int(((idx + 1) / len(records)) * 100)
         print(f"  -> [{progress}%] Đã hoàn thành {idx+1}/{len(records)}: {name}")
