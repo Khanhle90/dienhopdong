@@ -139,6 +139,37 @@ function downloadCurrentTemplate() {
   URL.revokeObjectURL(url);
 }
 
+// Tải file Excel mẫu chuẩn (Mẫu điền hợp đồng.xlsx)
+function downloadSampleExcel() {
+  if (typeof DEFAULT_EXCEL_B64 === 'undefined' || !DEFAULT_EXCEL_B64) {
+    showToast("Không tìm thấy dữ liệu file mẫu Excel.", "error");
+    return;
+  }
+  try {
+    const binaryString = window.atob(DEFAULT_EXCEL_B64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes.buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Mẫu_điền_hợp_đồng.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Đã tải xuống file mẫu Excel (Mẫu điền hợp đồng.xlsx)!", "success");
+  } catch (err) {
+    console.error("Lỗi tải mẫu Excel:", err);
+    showToast("Lỗi khi tải mẫu Excel: " + err.message, "error");
+  }
+}
+
 async function handleTemplateUpload(file) {
   if (!file) return;
   try {
@@ -674,78 +705,6 @@ function triggerPrint() {
       }
     }, 400);
   }, 100);
-}
-
-/**
- * CHỨC NĂNG TẢI VỀ PDF CHUẨN XUẤT SẮC:
- * - Dùng jsPDF từ thư viện jspdf.umd.min.js
- * - Render từng trang .contract-subpage chuẩn A4 (210x297mm)
- * - Mỗi hợp đồng đúng 2 trang A4, không lỗi bộ nhớ, không trang trắng
- */
-async function triggerDownloadPDF() {
-  const pages = document.querySelectorAll('#print-area .contract-subpage');
-  if (!pages || pages.length === 0) {
-    showToast("Chưa có hợp đồng nào được tạo.", "error");
-    return;
-  }
-
-  const btnDownload = document.getElementById('btn-download-pdf');
-  const originalText = btnDownload ? btnDownload.innerHTML : '';
-  if (btnDownload) {
-    btnDownload.disabled = true;
-  }
-
-  try {
-    const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-    if (!jsPDFClass) {
-      throw new Error("Không tìm thấy thư viện jsPDF. Vui lòng tải lại trang.");
-    }
-
-    const html2canvasFunc = window.html2canvas || (typeof html2canvas !== 'undefined' ? html2canvas : null);
-    if (!html2canvasFunc) {
-      throw new Error("Không tìm thấy thư viện html2canvas. Vui lòng tải lại trang.");
-    }
-
-    const pdf = new jsPDFClass('p', 'mm', 'a4');
-    const pdfWidth = 210;
-    const pdfHeight = 297;
-
-    for (let i = 0; i < pages.length; i++) {
-      if (btnDownload) {
-        const hdn = Math.floor(i / 2) + 1;
-        const subPage = (i % 2) + 1;
-        btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xuất HĐ ${hdn}/${state.excelData.length} (Trang ${subPage}/2)...`;
-      }
-
-      const pageEl = pages[i];
-      const canvas = await html2canvasFunc(pageEl, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.96);
-
-      if (i > 0) {
-        pdf.addPage('a4', 'p');
-      }
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-
-      await new Promise(r => setTimeout(r, 10));
-    }
-
-    pdf.save(`HopDong_TongHop_${state.excelData.length}_nguoi.pdf`);
-    showToast("Đã xuất và tải về file PDF thành công!", "success");
-  } catch (err) {
-    console.error("Lỗi xuất PDF:", err);
-    showToast("Gặp trục trặc khi tạo PDF: " + err.message + ". Bạn có thể nhấn 'In ngay' và chọn 'Lưu dưới dạng PDF' với chất lượng vector tuyệt đối!", "info");
-  } finally {
-    if (btnDownload) {
-      btnDownload.disabled = false;
-      btnDownload.innerHTML = originalText;
-    }
-  }
 }
 
 // Chức năng TẢI VỀ WORD (.DOCX) GỘP

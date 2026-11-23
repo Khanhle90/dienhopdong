@@ -298,6 +298,10 @@ def merge_documents(template_path, records, output_merged_path):
     - Mỗi người được phân tách bởi ngắt trang rõ ràng (pageBreak)
     - Không phát sinh trang trắng thừa
     """
+    if not records:
+        print("[!] Không có dữ liệu cộng tác viên trong bảng Excel để tạo hợp đồng.")
+        return
+
     print(f"\n[+] Bắt đầu tạo file hợp đồng tổng hợp cho {len(records)} người...")
     master_doc = None
     
